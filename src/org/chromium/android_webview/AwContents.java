@@ -51,6 +51,9 @@ import java.lang.annotation.Annotation;
 import java.net.MalformedURLException;
 import java.net.URL;
 
+
+import android.graphics.drawable.ShapeDrawable;
+import android.graphics.drawable.shapes.RectShape;
 /**
  * Exposes the native AwContents class, and together these classes wrap the ContentViewCore
  * and Browser components that are required to implement Android WebView API. This is the
@@ -134,9 +137,6 @@ public class AwContents {
     private Rect mGlobalVisibleBounds;
     private int mLastGlobalVisibleWidth;
     private int mLastGlobalVisibleHeight;
-
-    private boolean mContainerViewFocused;
-    private boolean mWindowFocused;
 
     private static final class DestroyRunnable implements Runnable {
         private int mNativeAwContents;
@@ -301,6 +301,8 @@ public class AwContents {
             // more of the containing view  becomes visible (i.e. a containing view
             // with a width/height of "wrap_content" and dimensions greater than
             // that of the screen).
+      
+
             AwContents.this.updatePhysicalBackingSizeIfNeeded();
          }
     };
@@ -466,9 +468,14 @@ public class AwContents {
                 mInternalAccessAdapter.requestDrawGL(canvas)) {
             return;
         }
+        
         Rect clip = canvas.getClipBounds();
-        if (!nativeDrawSW(mNativeAwContents, canvas, clip.left, clip.top,
-                clip.right - clip.left, clip.bottom - clip.top)) {
+        
+        int x = mContentViewCore.getNativeScrollXForTest();
+        int y = mContentViewCore.getNativeScrollYForTest();
+        
+        if (!nativeDrawSW(mNativeAwContents, canvas, clip.left + x, clip.top + y,
+        clip.right - clip.left, clip.bottom - clip.top)) { 
             Log.w(TAG, "Native DrawSW failed; clearing to background color.");
             int c = mContentViewCore.getBackgroundColor();
             canvas.drawRGB(Color.red(c), Color.green(c), Color.blue(c));
@@ -1121,16 +1128,13 @@ public class AwContents {
      * @see android.view.View#onWindowFocusChanged()
      */
     public void onWindowFocusChanged(boolean hasWindowFocus) {
-        mWindowFocused = hasWindowFocus;
-        mContentViewCore.onFocusChanged(mContainerViewFocused && mWindowFocused);
     }
 
     /**
      * @see android.view.View#onFocusChanged()
      */
     public void onFocusChanged(boolean focused, int direction, Rect previouslyFocusedRect) {
-        mContainerViewFocused = focused;
-        mContentViewCore.onFocusChanged(mContainerViewFocused && mWindowFocused);
+        mContentViewCore.onFocusChanged(focused, direction, previouslyFocusedRect);
     }
 
     /**
@@ -1239,10 +1243,6 @@ public class AwContents {
      */
     public void onInitializeAccessibilityEvent(AccessibilityEvent event) {
         mContentViewCore.onInitializeAccessibilityEvent(event);
-    }
-
-    public boolean supportsAccessibilityAction(int action) {
-        return mContentViewCore.supportsAccessibilityAction(action);
     }
 
     /**
